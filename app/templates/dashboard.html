@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetWatch - لوحة التحكم</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Oxanium:wght@400;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <!-- Styles moved to static/css/dashboard.css -->
+</head>
+<body>
+  <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="loader"></div>
+    <div class="loading-text">جاري التحميل...</div>
+  </div>
+  <div class="grid-bg"></div>
+  <div class="scan-line"></div>
+  
+  <div id="screen-app" style="display: flex;">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sb-header">
+        <div class="sb-logo">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.2"/><circle cx="10" cy="10" r="4" stroke="white" stroke-width="1.2" stroke-dasharray="2 2"/><circle cx="10" cy="10" r="2" fill="white"/></svg>
+        </div>
+        <div>
+          <div class="sb-title">NET<span>WATCH</span></div>
+          <div class="sb-version">v2.0 PROD</div>
+        </div>
+      </div>
+      
+      <div class="sb-section">
+        <div class="sb-section-label">المراقبة</div>
+        <div class="nav-item active" onclick="showPage('overview',this)">
+          <div class="nav-icon">📊</div> لوحة التحكم
+        </div>
+        <div class="nav-item" onclick="showPage('devices',this)">
+          <div class="nav-icon">💻</div> الأجهزة
+        </div>
+        <div class="nav-item" onclick="showPage('topology',this)">
+          <div class="nav-icon">🗺️</div> خريطة الشبكة
+        </div>
+      </div>
+      
+      <div class="sb-section">
+        <div class="sb-section-label">الإدارة</div>
+        <div class="nav-item" onclick="showPage('logs',this)">
+          <div class="nav-icon">📋</div> السجلات
+        </div>
+        <div class="nav-item" onclick="showPage('tools',this)">
+          <div class="nav-icon">🛠️</div> أدوات الشبكة
+        </div>
+        <div class="nav-item" onclick="showPage('add',this)">
+          <div class="nav-icon">➕</div> إضافة جهاز
+        </div>
+        <div class="nav-item" onclick="showPage('settings',this)">
+          <div class="nav-icon">⚙️</div> الإعدادات
+        </div>
+      </div>
+      
+      <div class="sb-footer">
+        <div class="sb-user" onclick="doLogout()">
+          <div class="user-av">{{ user.username[0].upper() }}</div>
+          <div>
+            <div class="user-name">{{ user.username }}</div>
+            <div class="user-role">Admin</div>
+          </div>
+          <div class="logout-icon" title="تسجيل الخروج">⏻</div>
+        </div>
+      </div>
+    </aside>
+    
+    <!-- MAIN CONTENT -->
+    <main class="content">
+      <!-- PAGE: OVERVIEW -->
+      <div id="page-overview" class="page active">
+        <div class="topbar">
+          <div>
+            <div class="page-title">DASHBOARD</div>
+            <div class="page-sub">آخر تحديث: <span id="lastUpdate">الآن</span>{% if current_network %} · شبكة: {{ current_network.name }}{% endif %}</div>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" onclick="fullRefresh()">↻ تحديث</button>
+            <button class="btn btn-primary" onclick="showPage('add',null)">+ إضافة جهاز</button>
+          </div>
+        </div>
+        
+        <div class="kpi-grid">
+          <div class="kpi-card k-green">
+            <div class="kpi-label"><span class="dot dot-green"></span> حالة الشبكة</div>
+            <div class="kpi-val" style="font-size: 20px; color: var(--green2);" id="kNetStatus">CLEAN ✓</div>
+            <div class="kpi-trend">لا توجد تهديدات</div>
+          </div>
+          <div class="kpi-card k-blue">
+            <div class="kpi-label"><span class="dot dot-blue"></span> الأجهزة المتصلة</div>
+            <div class="kpi-val" id="kOnline">0</div>
+            <div class="kpi-trend">من أصل <span id="kTotal">0</span> جهاز</div>
+          </div>
+          <div class="kpi-card k-green" id="kpiInternet">
+            <div class="kpi-label"><span class="dot dot-green"></span> حالة الإنترنت</div>
+            <div class="kpi-val" style="font-size: 20px; color: var(--green2);" id="kInternetVal">—</div>
+            <div class="kpi-trend" id="kInternetTrend">—</div>
+          </div>
+          <div class="kpi-card k-blue">
+            <div class="kpi-label"><span class="dot dot-blue"></span> التنبيهات النشطة</div>
+            <div class="kpi-val" style="color: var(--yellow2);" id="kAlerts">0</div>
+            <div class="kpi-trend">تحتاج مراجعة</div>
+          </div>
+          <div class="kpi-card k-purple">
+            <div class="kpi-label"><span class="dot dot-blue"></span> مستخدمي Hotspot</div>
+            <div class="kpi-val" id="kHotspot">0</div>
+            <div class="kpi-trend">متصلون الآن</div>
+          </div>
+        </div>
+
+        {% if current_network %}
+        <div class="overview-card" style="margin: 20px 0; padding: 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 20px;">
+          <div class="card-header" style="margin-bottom: 14px;">
+            <div class="card-title">بيانات حية من الراوتر</div>
+            <div class="card-subtitle">{{ current_network.name }} · يُطلب إدخال بيانات الراوتر بعد تسجيل الدخول عند الحاجة</div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+            <div style="padding: 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;">
+              <div style="font-size: 12px; color: var(--text3); margin-bottom: 6px;">اسم الراوتر (Identity)</div>
+              <div style="font-size: 18px; color: var(--text); font-weight: 600;" id="kMikrotikIdentity">—</div>
+            </div>
+            <div style="padding: 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;">
+              <div style="font-size: 12px; color: var(--text3); margin-bottom: 6px;">Hotspot — جلسات نشطة</div>
+              <div style="font-size: 18px; color: var(--cyan); font-weight: 600;" id="kHotspotLive">—</div>
+            </div>
+          </div>
+          <div style="margin-top: 16px; padding: 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;">
+            <div style="font-size: 12px; color: var(--text3); margin-bottom: 8px;">حركة WAN (TX / RX) — حسب Public IP في الإعدادات</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-family: var(--mono);">
+              <span style="color: var(--text3);">الواجهة:</span> <span id="wanIface" style="color: var(--cyan);">—</span>
+              <span style="color: var(--text3);">RX:</span> <span id="wanRx" style="color: var(--green2);">—</span>
+              <span style="color: var(--text3);">TX:</span> <span id="wanTx" style="color: var(--blue);">—</span>
+            </div>
+          </div>
+          <div style="margin-top: 16px;">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text);">DHCP Client</div>
+            <div style="overflow-x: auto; border: 1px solid var(--border); border-radius: 12px;">
+              <table class="data-table" style="width: 100%; font-size: 13px;">
+                <thead><tr>
+                  <th style="padding: 10px 14px;">Interface</th>
+                  <th style="padding: 10px 14px;">Status</th>
+                  <th style="padding: 10px 14px;">Address</th>
+                </tr></thead>
+                <tbody id="dhcpClientBody"><tr><td colspan="3" style="padding: 16px; color: var(--text3); text-align: center;">—</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px;">
+            <div style="padding: 14px; background: var(--bg2); border-radius: 12px; border: 1px solid var(--border);">
+              <div style="font-size: 11px; color: var(--text3);">CPU load</div>
+              <div id="healthCpu" style="font-size: 16px; font-weight: 600;">—</div>
+            </div>
+            <div style="padding: 14px; background: var(--bg2); border-radius: 12px; border: 1px solid var(--border);">
+              <div style="font-size: 11px; color: var(--text3);">Temperature</div>
+              <div id="healthTemp" style="font-size: 16px; font-weight: 600;">—</div>
+            </div>
+            <div style="padding: 14px; background: var(--bg2); border-radius: 12px; border: 1px solid var(--border);">
+              <div style="font-size: 11px; color: var(--text3);">Voltage</div>
+              <div id="healthVolt" style="font-size: 16px; font-weight: 600;">—</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div style="display: grid; grid-template-columns: 1fr 300px; gap: 16px;">
+          <div class="table-card">
+            <div class="card-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+              <div class="card-title">أبرز الأجهزة</div>
+            </div>
+            <table class="data-table" style="width:100%;">
+              <thead><tr>
+                <th style="padding: 12px 16px;">الجهاز</th>
+                <th style="padding: 12px 16px;">IP</th>
+                <th style="padding: 12px 16px;">الحالة</th>
+              </tr></thead>
+              <tbody id="quickTbl"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- PAGE: DEVICES -->
+      <div id="page-devices" class="page">
+        <div class="topbar">
+          <div>
+            <div class="page-title">DEVICES</div>
+            <div class="page-sub">إدارة جميع أجهزة الشبكة</div>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" onclick="loadDevices()">↻ تحديث القائمة</button>
+            <button class="btn btn-secondary" onclick="refreshAllDeviceStatus()">⟳ تحديث الحالة (Ping)</button>
+            <button class="btn btn-primary" onclick="showPage('add',null)">+ إضافة جهاز يدوياً</button>
+          </div>
+        </div>
+        {% if not current_network %}
+        <div class="form-panel" style="margin-bottom: 18px; background: linear-gradient(135deg, var(--red), var(--red2)); border: 2px solid var(--red2); border-radius: 12px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);">
+          <div style="color: white; text-align: center; padding: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px;">
+            <span style="font-size: 48px;">🚫</span>
+            <div style="font-size: 18px; font-weight: 600;">لا توجد شبكات متاحة</div>
+            <div style="font-size: 14px; opacity: 0.9;">يرجى إضافة شبكة أولاً أو التحقق من صلاحياتك</div>
+          </div>
+        </div>
+        {% else %}
+        <div class="form-panel" style="margin-bottom: 24px; gap: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);">
+          <div class="f-group">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text); font-size: 14px;">اختر الواجهة <small style="color: var(--text3); font-weight: 400;">(شبكة: {{ current_network.name if current_network else 'غير محدد' }})</small></label>
+            <div id="interfacesList" style="width: 100%; max-height: 250px; overflow-y: auto; border: 2px solid var(--border); border-radius: 12px; background: var(--bg2); padding: 12px; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);">
+              <div style="color: var(--text3); text-align: center; padding: 20px; font-style: italic;">جارٍ تحميل الواجهات...</div>
+            </div>
+          </div>
+          <div class="f-group">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text); font-size: 14px;">نطاق IP للمسح</label>
+            <input id="scanRange" type="text" placeholder="مثال: 192.168.1.0/24" style="width: 100%; padding: 14px 16px; border: 2px solid var(--border); border-radius: 10px; background: var(--bg2); color: var(--text); font-size: 14px; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+          </div>
+          <div class="f-group" style="align-self: end;">
+            <button class="btn btn-secondary" style="width: 100%; padding: 14px 20px; font-size: 16px; font-weight: 600; border-radius: 10px; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);" onclick="scanNetwork()">🔍 بدء المسح (معاينة)</button>
+          </div>
+          <div class="f-group" style="align-self: end;">
+            <button class="btn btn-primary" style="width: 100%; padding: 14px 20px; font-size: 16px; font-weight: 600; border-radius: 10px;" onclick="saveScanToTable()" id="btnSaveScan" disabled>💾 حفظ في الجدول (UP/DOWN من الراوتر)</button>
+          </div>
+          <div class="f-group" style="align-self: end; display: flex; align-items: center; justify-content: flex-start;">
+            <span id="scanStatus" style="color: var(--text3); font-size: 14px; font-style: italic;">اختر واجهة والنطاق ثم اضغط مسح — النتائج تظهر أدناه دون حفظ حتى تضغط «حفظ في الجدول»</span>
+          </div>
+        </div>
+        <div id="scanPreviewCard" class="table-card" style="display: none; margin-bottom: 20px; border-radius: 16px; border: 1px solid var(--border); overflow: hidden;">
+          <div style="padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--border); font-weight: 600;">نتائج المسح (معاينة — كما أرجعها الراوتر)</div>
+          <div style="overflow-x: auto;">
+            <table class="data-table" style="width: 100%;">
+              <thead><tr>
+                <th style="padding: 12px 16px;">IP</th>
+                <th style="padding: 12px 16px;">MAC</th>
+                <th style="padding: 12px 16px;">الاسم</th>
+              </tr></thead>
+              <tbody id="scanPreviewBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="table-card" style="border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); border: 1px solid var(--border);">
+          <div class="table-toolbar" style="background: var(--panel); border-bottom: 1px solid var(--border); padding: 16px 20px;">
+            <div class="search-box" style="flex: 1; max-width: 300px;">
+              <input placeholder="بحث عن جهاز، IP، MAC..." oninput="filterDev(this.value)" style="width: 100%; padding: 10px 14px; border: 2px solid var(--border); border-radius: 8px; background: var(--bg2); color: var(--text);">
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="filter-pill on" onclick="filterStatus('all',this)" style="padding: 8px 16px; border: 2px solid var(--blue); background: var(--blue); color: white; border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">الكل</button>
+              <button class="filter-pill" onclick="filterStatus('online',this)" style="padding: 8px 16px; border: 2px solid var(--green); background: transparent; color: var(--green); border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">UP</button>
+              <button class="filter-pill" onclick="filterStatus('warning',this)" style="padding: 8px 16px; border: 2px solid var(--yellow); background: transparent; color: var(--yellow); border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Warning</button>
+              <button class="filter-pill" onclick="filterStatus('offline',this)" style="padding: 8px 16px; border: 2px solid var(--red); background: transparent; color: var(--red); border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">DOWN</button>
+            </div>
+          </div>
+          <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead style="background: var(--panel);">
+              <tr>
+                <th style="padding: 16px 20px; text-align: right; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border);">الجهاز</th>
+                <th style="padding: 16px 20px; text-align: left; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-family: var(--mono);">IP Address</th>
+                <th style="padding: 16px 20px; text-align: left; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-family: var(--mono);">MAC Address</th>
+                <th style="padding: 16px 20px; text-align: center; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border);">Type</th>
+                <th style="padding: 16px 20px; text-align: left; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border);">Description</th>
+                <th style="padding: 16px 20px; text-align: center; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border);">Status</th>
+                <th style="padding: 16px 20px; text-align: center; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border);">Ping (MikroTik)</th>
+              </tr>
+            </thead>
+            <tbody id="fullDevTbl" style="background: var(--bg);"></tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- PAGE: TOPOLOGY -->
+      <div id="page-topology" class="page">
+        <div class="topbar">
+          <div>
+            <div class="page-title">TOPOLOGY MAP</div>
+            <div class="page-sub">شجرة: الراوتر ← الأجهزة (نمط NetWatch)</div>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" onclick="drawTopo()">↻ تحديث</button>
+          </div>
+        </div>
+        <div class="topo-wrap" style="background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;">
+          <div class="topo-toolbar" style="padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 12px; color: var(--text3); margin-left: auto;">الأجهزة: <b style="color: var(--text)" id="topoCount">0</b></span>
+          </div>
+          <canvas id="topoCanvas" height="540" style="width: 100%; display: block; background: #050810;"></canvas>
+          <div style="padding: 12px 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text3); display: flex; gap: 20px;">
+            <span><span style="color: #10b981;">●</span> UP</span>
+            <span><span style="color: #ef4444;">●</span> DOWN</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- PAGE: LOGS -->
+      <div id="page-logs" class="page">
+        <div class="topbar">
+          <div>
+            <div class="page-title">سجل الراوتر</div>
+            <div class="page-sub">آخر سطور من <code style="font-size:12px;">/log print</code> على MikroTik</div>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" onclick="loadRouterLogs()">↻ تحديث</button>
+          </div>
+        </div>
+        <div class="table-card" style="padding: 0; overflow: hidden;">
+          <div style="max-height: 70vh; overflow: auto;">
+            <table class="data-table" style="width: 100%; font-size: 12px;">
+              <thead>
+                <tr>
+                  <th style="padding: 10px 12px; width: 140px;">Time</th>
+                  <th style="padding: 10px 12px; width: 160px;">Topic</th>
+                  <th style="padding: 10px 12px;">Message</th>
+                </tr>
+              </thead>
+              <tbody id="routerLogsBody">
+                <tr><td colspan="3" style="padding: 20px; color: var(--text3); text-align: center;">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: TOOLS -->
+      <div id="page-tools" class="page">
+        <div class="topbar">
+          <div>
+            <div class="page-title">NETWORK TOOLS</div>
+            <div class="page-sub">Ping و Traceroute من MikroTik مباشرة</div>
+          </div>
+        </div>
+        <div class="form-panel" style="max-width: 100%;">
+          <div class="form-grid" style="grid-template-columns: 220px 1fr 180px;">
+            <div class="f-group">
+              <label>الأداة</label>
+              <select id="toolType">
+                <option value="ping">Ping</option>
+                <option value="traceroute">Traceroute</option>
+              </select>
+            </div>
+            <div class="f-group">
+              <label>IP Address</label>
+              <input id="toolIp" type="text" placeholder="مثال: 8.8.8.8">
+            </div>
+            <div class="f-group" style="align-self: end;">
+              <button class="btn btn-primary" style="width: 100%;" onclick="runNetworkTool()">تشغيل</button>
+            </div>
+          </div>
+          <div style="margin-top: 14px;">
+            <label style="font-size: 12px; color: var(--text3);">النتيجة</label>
+            <pre id="toolOutput" style="margin-top: 8px; padding: 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; min-height: 220px; color: var(--text2); white-space: pre-wrap;">—</pre>
+          </div>
+          <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+              <label style="font-size: 13px; color: var(--text); font-weight:600;">DHCP Leases</label>
+              <button class="btn btn-ghost" type="button" onclick="loadDhcpLeases()">↻ تحديث DHCP Leases</button>
+            </div>
+            <div style="margin-top:10px; overflow:auto; border:1px solid var(--border); border-radius:12px;">
+              <table class="data-table" style="width:100%; min-width:760px;">
+                <thead>
+                  <tr>
+                    <th style="padding:10px 12px;">IP</th>
+                    <th style="padding:10px 12px;">MAC</th>
+                    <th style="padding:10px 12px;">Status</th>
+                    <th style="padding:10px 12px;">Server</th>
+                    <th style="padding:10px 12px;">Host</th>
+                    <th style="padding:10px 12px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="dhcpLeaseBody">
+                  <tr><td colspan="6" style="padding:16px; color:var(--text3); text-align:center;">اضغط تحديث لعرض القائمة</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end;">
+              <div class="f-group">
+                <label>Kick by IP</label>
+                <input id="kickIp" type="text" placeholder="192.168.1.10">
+              </div>
+              <div class="f-group">
+                <label>Kick by MAC</label>
+                <input id="kickMac" type="text" placeholder="AA:BB:CC:DD:EE:FF">
+              </div>
+              <button class="btn btn-primary" type="button" onclick="kickDhcpLease()">طرد Lease</button>
+            </div>
+            <div id="dhcpKickStatus" style="margin-top:8px; font-size:12px; color:var(--text3);"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- PAGE: ADD DEVICE -->
+      <div id="page-add" class="page">
+        <div class="topbar">
+          <div>
+            <div class="page-title">ADD DEVICE</div>
+            <div class="page-sub">إضافة جهاز جديد للشبكة</div>
+          </div>
+        </div>
+        <div class="form-panel">
+          <div class="form-section-title">⬡ معلومات الجهاز</div>
+          <div class="form-grid">
+            <div class="f-group">
+              <label>اسم الجهاز *</label>
+              <input id="fName" type="text" placeholder="مثال: MikroTik-Core-01">
+            </div>
+            <div class="f-group">
+              <label>نوع الجهاز *</label>
+              <select id="fType">
+                <option>🔀 Router</option>
+                <option>🔌 Switch</option>
+                <option>📡 Access Point</option>
+                <option>💻 Server</option>
+              </select>
+            </div>
+            <div class="f-group">
+              <label>عنوان IP *</label>
+              <input id="fIP" type="text" placeholder="192.168.1.x">
+            </div>
+            <div class="f-group">
+              <label>عنوان MAC (اختياري)</label>
+              <input id="fMAC" type="text" placeholder="AA:BB:CC:DD:EE:FF">
+            </div>
+            <div class="f-group" style="grid-column: 1 / -1;">
+              <label>الوصف / ملاحظات</label>
+              <input id="fDesc" type="text" placeholder="وصف مختصر للجهاز (اختياري)">
+            </div>
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 20px;">
+            <button class="btn btn-primary" onclick="addDevice()">➕ إضافة الجهاز</button>
+            <button class="btn btn-ghost" onclick="clearForm()">مسح</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- PAGE: SETTINGS -->
+      <div id="page-settings" class="page">
+        <div class="topbar">
+          <div>
+            <div class="page-title">SETTINGS</div>
+            <div class="page-sub">إعدادات النظام والإشعارات</div>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="settings-card">
+            <div class="settings-title">🔔 إعدادات التنبيهات</div>
+            <div class="f-group" style="margin-bottom: 14px;">
+              <label>البريد الإلكتروني</label>
+              <input type="email" value="admin@company.com">
+            </div>
+            <div class="f-group" style="margin-bottom: 18px;">
+              <label>مستوى التنبيه</label>
+              <select>
+                <option>كل الأحداث</option>
+                <option>تحذيرات فقط</option>
+                <option>حرجة فقط</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" style="padding: 6px 12px;">حفظ</button>
+          </div>
+          <div class="settings-card">
+            <div class="settings-title">⏱ جدولة الفحوصات</div>
+            <div class="f-group" style="margin-bottom: 14px;">
+              <label>فترة Ping (ثانية)</label>
+              <input type="number" value="30" min="10">
+            </div>
+            <div class="f-group" style="margin-bottom: 18px;">
+              <label>حد التحذير (ms)</label>
+              <input type="number" value="150">
+            </div>
+            <button class="btn btn-primary" style="padding: 6px 12px;">حفظ</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="mikrotikFirstLoginModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1300; align-items:center; justify-content:center;">
+    <div style="width:min(92vw,440px); background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:22px;">
+      <div style="font-size:17px; font-weight:700; margin-bottom:6px;">اتصال MikroTik</div>
+      <div style="font-size:12px; color:var(--text3); margin-bottom:16px;">تم تسجيل الدخول للموقع. أدخل اسم المستخدم وكلمة مرور الراوتر. عنوان IP والمنفذ مأخوذان من قاعدة البيانات.</div>
+      <div style="display:grid; gap:10px; margin-bottom:14px; font-size:13px; font-family:var(--mono); color:var(--cyan);">
+        <div>IP: <span id="dlgMikrotikIp">—</span></div>
+        <div>Port (SSH): <span id="dlgMikrotikPort">8728</span></div>
+      </div>
+      <div class="f-group" style="margin-bottom:10px;">
+        <label>Username</label>
+        <input id="dlgMikrotikUser" type="text" placeholder="admin" autocomplete="off">
+      </div>
+      <div class="f-group" style="margin-bottom:12px;">
+        <label>Password</label>
+        <input id="dlgMikrotikPass" type="password" placeholder="كلمة المرور" autocomplete="off">
+      </div>
+      <div id="dlgMikrotikStatus" style="font-size:12px; color:var(--text3); margin-bottom:12px;"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="submitMikrotikFirstLogin()">اتصال</button>
+    </div>
+  </div>
+
+  <script>
+    // WebSocket Connection
+    let ws = null;
+    let isConnecting = false;
+    
+    function connectWebSocket() {
+      if (isConnecting || ws) return;
+      isConnecting = true;
+      
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${protocol}://${window.location.host}/ws/dashboard`);
+      
+      ws.onopen = () => {
+        console.log('WebSocket متصل');
+        isConnecting = false;
+        fullRefresh();
+      };
+      
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        updateDashboard(data);
+      };
+      
+      ws.onerror = () => {
+        isConnecting = false;
+        console.error('خطأ WebSocket');
+      };
+      
+      ws.onclose = () => {
+        ws = null;
+        isConnecting = false;
+        setTimeout(connectWebSocket, 3000);
+      };
+    }
+    
+    function showPage(pageId, elem) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(`page-${pageId}`).classList.add('active');
+      if (elem) elem.classList.add('active');
+
+      // تحديثات تلقائية حسب الصفحة
+      if (pageId === 'devices') {
+        loadDevices();
+        loadInterfaces();
+      }
+      if (pageId === 'topology') {
+        setTimeout(() => drawTopo(), 50);
+      }
+      if (pageId === 'logs') {
+        loadRouterLogs();
+      }
+      if (pageId === 'tools') {
+        loadDhcpLeases();
+      }
+    }
+    
+    function fullRefresh() {
+      console.log('🔄 طلب تحديث كامل للوحة...');
+      showLoading('جاري تحديث لوحة التحكم...');
+      fetch('/update_data')
+        .then(r => r.json())
+        .then(data => {
+          console.log('📡 استجابة update_data:', data);
+          updateDashboard(data);
+          if (currentNetworkId) {
+            loadDevices(true);
+            loadRouterLiveWidgets();
+          }
+        })
+        .catch(err => console.error('خطأ التحديث:', err))
+        .finally(() => hideLoading());
+    }
+
+    /** تحديث خلفي بدون إظهار شاشة التحميل (Live) */
+    function liveSilentDashboard() {
+      fetch('/update_data')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.success !== false) updateDashboard(data);
+        })
+        .catch(() => {});
+      if (currentNetworkId) loadRouterLiveWidgets();
+    }
+
+    let livePollTimer = null;
+    let routerSyncTimer = null;
+
+    function startLivePolling() {
+      stopLivePolling();
+      livePollTimer = setInterval(() => {
+        if (document.hidden) return;
+        liveSilentDashboard();
+        loadDevicesSilent();
+      }, 15000);
+      routerSyncTimer = setInterval(() => {
+        if (document.hidden || !currentNetworkId) return;
+        fetch(`/api/networks/${currentNetworkId}/devices/refresh`, { method: 'POST' })
+          .then(() => loadDevicesSilent())
+          .catch(() => {});
+      }, 90000);
+    }
+
+    function stopLivePolling() {
+      if (livePollTimer) {
+        clearInterval(livePollTimer);
+        livePollTimer = null;
+      }
+      if (routerSyncTimer) {
+        clearInterval(routerSyncTimer);
+        routerSyncTimer = null;
+      }
+    }
+
+    function loadDevicesSilent() {
+      if (!currentNetworkId) return;
+      fetch(`/api/networks/${currentNetworkId}/devices`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) renderDevicesTable(data.devices || []);
+        })
+        .catch(() => {});
+    }
+
+    function checkMikrotikFirstLoginDialog() {
+      fetch('/api/mikrotik/network-info')
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success || !data.has_network || data.session_active) return;
+          if (data.network_id != null) window._mikrotikDialogNetworkId = data.network_id;
+          const modal = document.getElementById('mikrotikFirstLoginModal');
+          const ipEl = document.getElementById('dlgMikrotikIp');
+          const portEl = document.getElementById('dlgMikrotikPort');
+          const u = document.getElementById('dlgMikrotikUser');
+          if (ipEl) ipEl.textContent = data.mikrotik_ip || '—';
+          if (portEl) portEl.textContent = String(data.mikrotik_port || 8728);
+          if (u && !u.value.trim()) u.value = 'admin';
+          if (modal) modal.style.display = 'flex';
+        })
+        .catch(() => {});
+    }
+
+    function submitMikrotikFirstLogin() {
+      const userEl = document.getElementById('dlgMikrotikUser');
+      const passEl = document.getElementById('dlgMikrotikPass');
+      const statusEl = document.getElementById('dlgMikrotikStatus');
+      const username = (userEl?.value || '').trim();
+      const password = (passEl?.value || '').trim();
+      const nid = currentNetworkId || window._mikrotikDialogNetworkId;
+      if (!nid) {
+        if (statusEl) statusEl.textContent = 'لا توجد شبكة.';
+        return;
+      }
+      if (!username || !password) {
+        if (statusEl) statusEl.textContent = 'أدخل اسم المستخدم وكلمة المرور.';
+        return;
+      }
+      if (statusEl) statusEl.textContent = 'جاري الاتصال...';
+      fetch(`/api/networks/${nid}/mikrotik/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            if (passEl) passEl.value = '';
+            const modal = document.getElementById('mikrotikFirstLoginModal');
+            if (modal) modal.style.display = 'none';
+            if (statusEl) statusEl.textContent = '';
+            loadInterfaces();
+            fullRefresh();
+            startLivePolling();
+          } else if (statusEl) {
+            statusEl.textContent = data.message || 'فشل الاتصال';
+          }
+        })
+        .catch(() => {
+          if (statusEl) statusEl.textContent = 'خطأ في الاتصال بالخادم';
+        });
+    }
+    
+    function loadRouterLiveWidgets() {
+      if (!currentNetworkId) return;
+      const q = `network_id=${currentNetworkId}`;
+      fetch(`/api/dashboard/router-live?${q}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) return;
+          const tbody = document.getElementById('dhcpClientBody');
+          if (tbody && Array.isArray(data.dhcp_clients)) {
+            if (!data.dhcp_clients.length) {
+              tbody.innerHTML = '<tr><td colspan="3" style="padding: 16px; color: var(--text3); text-align: center;">لا بيانات DHCP أو غير متصل</td></tr>';
+            } else {
+              tbody.innerHTML = data.dhcp_clients.map(r => `
+                <tr>
+                  <td style="padding: 10px 14px; font-family: var(--mono);">${r.interface || '-'}</td>
+                  <td style="padding: 10px 14px;">${r.status || '-'}</td>
+                  <td style="padding: 10px 14px; font-family: var(--mono);">${r.address || '-'}</td>
+                </tr>
+              `).join('');
+            }
+          }
+          const h = data.health || {};
+          const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null && v !== '' ? String(v) : '—'; };
+          const cpu = h.cpu_load;
+          const cpuStr = cpu != null && cpu !== ''
+            ? (String(cpu).includes('%') ? String(cpu) : String(cpu) + '%')
+            : null;
+          setTxt('healthCpu', cpuStr);
+          setTxt('healthTemp', h.temperature != null && h.temperature !== '' ? h.temperature : null);
+          setTxt('healthVolt', h.voltage != null && h.voltage !== '' ? h.voltage : null);
+        })
+        .catch(() => {});
+    }
+
+    function escHtml(s) {
+      if (s == null) return '';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function loadRouterLogs() {
+      const tbody = document.getElementById('routerLogsBody');
+      if (!tbody || !currentNetworkId) return;
+      tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; color: var(--text3); text-align: center;">جاري التحميل...</td></tr>';
+      fetch(`/api/dashboard/router-logs?network_id=${currentNetworkId}&limit=50`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) {
+            tbody.innerHTML = `<tr><td colspan="3" style="padding: 20px; color: var(--text3); text-align: center;">${escHtml(data.message || data.error || 'تعذر الجلب')}</td></tr>`;
+            return;
+          }
+          const rows = Array.isArray(data.entries) && data.entries.length
+            ? data.entries
+            : (Array.isArray(data.lines) ? data.lines.map(raw => ({ time: '', topic: '', message: raw, raw })) : []);
+          if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; color: var(--text3); text-align: center;">(لا سجلات)</td></tr>';
+            return;
+          }
+          tbody.innerHTML = rows.map(e => `
+            <tr>
+              <td style="padding: 10px 12px; font-family: var(--mono); white-space: nowrap; vertical-align: top;">${escHtml(e.time || '—')}</td>
+              <td style="padding: 10px 12px; font-family: var(--mono); vertical-align: top;">${escHtml(e.topic || '—')}</td>
+              <td style="padding: 10px 12px; font-family: var(--mono); color: var(--text2); vertical-align: top; word-break: break-word;">${escHtml(e.message || e.raw || '')}</td>
+            </tr>
+          `).join('');
+        })
+        .catch(() => {
+          tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; color: var(--text3); text-align: center;">خطأ في الاتصال</td></tr>';
+        });
+    }
+
+    function updateDashboard(data) {
+      if (!data) return;
+      document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('ar-SA');
+      document.getElementById('kOnline').textContent = data.online_count ?? 0;
+      document.getElementById('kTotal').textContent = data.total_count ?? 0;
+      document.getElementById('kAlerts').textContent = data.alerts_count ?? 0;
+      const hs = data.hotspot_active_users != null ? data.hotspot_active_users : (data.hotspot_users || 0);
+      const kHs = document.getElementById('kHotspot');
+      if (kHs) kHs.textContent = hs;
+      const kHsLive = document.getElementById('kHotspotLive');
+      if (kHsLive) kHsLive.textContent = hs;
+
+      const identityEl = document.getElementById('kMikrotikIdentity');
+      if (identityEl && data.mikrotik_identity) {
+        identityEl.textContent = data.mikrotik_identity;
+      }
+
+      const iv = document.getElementById('kInternetVal');
+      const it = document.getElementById('kInternetTrend');
+      if (iv && it) {
+        if (data.internet_status === 'online') {
+          iv.textContent = 'متصل ↑';
+          iv.style.color = 'var(--green2)';
+          it.textContent = data.internet_message || '—';
+        } else if (data.internet_status === 'offline') {
+          iv.textContent = 'غير متصل ↓';
+          iv.style.color = 'var(--red2)';
+          it.textContent = data.internet_message || '—';
+        } else {
+          iv.textContent = '—';
+          iv.style.color = 'var(--yellow2)';
+          it.textContent = data.internet_message || 'جاري التحقق';
+        }
+      }
+
+      const wi = document.getElementById('wanIface');
+      const wr = document.getElementById('wanRx');
+      const wt = document.getElementById('wanTx');
+      if (wi && wr && wt) {
+        wi.textContent = data.wan_interface || '—';
+        const wanNA = data.wan_rx_mbps == null && data.wan_tx_mbps == null;
+        wr.textContent = data.wan_rx_mbps != null ? (Number(data.wan_rx_mbps).toFixed(2) + ' Mbps') : (wanNA ? 'No Data' : '—');
+        wt.textContent = data.wan_tx_mbps != null ? (Number(data.wan_tx_mbps).toFixed(2) + ' Mbps') : (wanNA ? 'No Data' : '—');
+      }
+
+      /* الأجهزة تُحدَّث عبر loadDevices / loadDevicesSilent (قائمة كاملة). update_data يعيد عيّنة صغيرة فقط. */
+    }
+    
+    let lastDevices = [];
+    let lastScanDevices = [];
+
+    function statusDisplay(st) {
+      if (st === 'online') return 'UP';
+      if (st === 'offline') return 'DOWN';
+      return st || 'unknown';
+    }
+
+    function statusFilterKey(st) {
+      if (st === 'online') return 'online';
+      if (st === 'offline') return 'offline';
+      return st || '';
+    }
+
+    function renderDevicesTable(devices) {
+      lastDevices = Array.isArray(devices) ? devices : [];
+      const fullBody = document.getElementById('fullDevTbl');
+      const quickBody = document.getElementById('quickTbl');
+      if (!fullBody && !quickBody) return;
+
+      if (fullBody && lastDevices.length === 0) {
+        fullBody.innerHTML = `
+          <tr>
+            <td colspan="7" style="padding: 28px; text-align: center; color: var(--text3);">
+              لا توجد أجهزة في الجدول. نفّذ مسحاً ثم «حفظ في الجدول»، أو أضف جهازاً يدوياً.
+            </td>
+          </tr>
+        `;
+      }
+
+      const buildFullRows = (rows) => rows.map(d => {
+        const fk = statusFilterKey(d.status);
+        const safeIp = String(d.ip || '').replace(/[^0-9.]/g, '');
+        const devId = d.id != null ? d.id : '';
+        const ipHtml = safeIp
+          ? `<a href="http://${safeIp}" target="_blank" rel="noopener noreferrer" style="color: var(--cyan); font-weight: 500; text-decoration: underline;">${escHtml(d.ip || safeIp)}</a>`
+          : escHtml(d.ip || '-');
+        const stLabel = statusDisplay(d.status);
+        const stClass = fk === 'online' ? 'green' : fk === 'warning' ? 'yellow' : 'red';
+
+        return `
+          <tr data-status="${fk}" style="border-bottom: 1px solid var(--border2); transition: all 0.2s ease;">
+            <td style="padding: 16px 20px;"><div class="dev-cell" style="display: flex; align-items: center; gap: 12px;">
+              <div class="dev-ico" style="font-size: 24px;">💻</div>
+              <div>
+                <div class="dev-name" style="font-weight: 600; color: var(--text);">${escHtml(d.name || '')}</div>
+              </div>
+            </div></td>
+            <td style="padding: 16px 20px; font-family: var(--mono); font-weight: 500;">${ipHtml}</td>
+            <td style="padding: 16px 20px; font-family: var(--mono); color: var(--text3);">${escHtml(d.mac || '-')}</td>
+            <td style="padding: 16px 20px; text-align: center;">${escHtml(d.type || '-')}</td>
+            <td style="padding: 16px 20px; color: var(--text2); max-width: 200px; word-break: break-word;">${escHtml(d.description || '-')}</td>
+            <td style="padding: 16px 20px; text-align: center;"><span class="chip chip-${stClass}" style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">${stLabel}</span></td>
+            <td style="padding: 12px 16px; vertical-align: top;">
+              <button type="button" class="btn btn-ghost" style="padding: 6px 10px; font-size: 12px; margin-bottom: 6px;" onclick="pingDeviceRouterInline(${devId}, '${safeIp}')">Ping من الراوتر</button>
+              <pre id="ping-out-${devId}" style="margin:0; max-height:120px; overflow:auto; font-size:11px; color:var(--text2); white-space:pre-wrap; font-family:var(--mono); background:var(--bg2); padding:8px; border-radius:8px; border:1px solid var(--border); display:none;"></pre>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const buildQuickRows = (rows) => rows.map(d => {
+        const fk = statusFilterKey(d.status);
+        const stLabel = statusDisplay(d.status);
+        const stClass = fk === 'online' ? 'green' : fk === 'warning' ? 'yellow' : 'red';
+        return `
+          <tr data-status="${fk}">
+            <td style="padding: 12px 16px;">${escHtml(d.name || '')}</td>
+            <td style="padding: 12px 16px; font-family: var(--mono);">${escHtml(d.ip || '-')}</td>
+            <td style="padding: 12px 16px; text-align: center;"><span class="chip chip-${stClass}" style="padding: 4px 10px; border-radius: 12px; font-size: 11px;">${stLabel}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      if (quickBody) {
+        const q = devices.slice(0, 5);
+        quickBody.innerHTML = q.length ? buildQuickRows(q) : '<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--text3);">لا أجهزة</td></tr>';
+      }
+      if (fullBody && lastDevices.length) {
+        fullBody.innerHTML = buildFullRows(devices);
+      }
+      if (typeof window._deviceStatusFilter === 'string' && window._deviceStatusFilter !== 'all') {
+        filterStatus(window._deviceStatusFilter, document.querySelector('#page-devices .filter-pill.on'));
+      }
+      if (document.getElementById('page-topology')?.classList.contains('active')) {
+        setTimeout(() => drawTopo(), 30);
+      }
+    }
+
+    function pingDeviceRouterInline(deviceId, safeIp) {
+      if (!currentNetworkId || !safeIp) return;
+      const pre = document.getElementById('ping-out-' + deviceId);
+      if (pre) {
+        pre.style.display = 'block';
+        pre.textContent = 'جاري Ping من MikroTik...';
+      }
+      fetch(`/api/networks/${currentNetworkId}/devices/${encodeURIComponent(safeIp)}/ping?source=router&verbose=1`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (pre) pre.textContent = data.output || data.message || (data.success ? 'UP' : 'DOWN');
+          loadDevicesSilent();
+          liveSilentDashboard();
+        })
+        .catch(() => { if (pre) pre.textContent = 'خطأ في الاتصال'; });
+    }
+
+    function refreshAllDeviceStatus() {
+      if (!currentNetworkId) return;
+      showLoading('جاري تحديث حالة جميع الأجهزة من الراوتر...');
+      fetch(`/api/networks/${currentNetworkId}/devices/refresh`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message || 'تم التحديث');
+            loadDevices();
+            fullRefresh();
+          } else {
+            alert(data.message || 'فشل التحديث');
+          }
+        })
+        .catch(() => alert('خطأ في الاتصال'))
+        .finally(() => hideLoading());
+    }
+
+    function drawTopo() {
+      const canvas = document.getElementById('topoCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const W = canvas.offsetWidth || 920;
+      canvas.width = W;
+
+      const devices = (lastDevices && lastDevices.length) ? lastDevices : [];
+
+      const paintGrid = (bh) => {
+        ctx.clearRect(0, 0, W, bh);
+        ctx.fillStyle = '#050810';
+        ctx.fillRect(0, 0, W, bh);
+        ctx.strokeStyle = 'rgba(56,189,248,0.04)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < W; x += 32) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, bh);
+          ctx.stroke();
+        }
+        for (let y = 0; y < bh; y += 32) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(W, y);
+          ctx.stroke();
+        }
+      };
+
+      if (!devices.length) {
+        canvas.height = 540;
+        paintGrid(540);
+        const tc0 = document.getElementById('topoCount');
+        if (tc0) tc0.textContent = '0';
+        if (currentNetworkId) {
+          fetch(`/api/networks/${currentNetworkId}/devices`)
+            .then(r => r.json())
+            .then(data => {
+              if (data && data.success) {
+                renderDevicesTable(data.devices || []);
+                setTimeout(() => drawTopo(), 50);
+              }
+            })
+            .catch(() => {});
+        }
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '15px Tajawal';
+        ctx.fillText('لا توجد أجهزة. نفّذ مسحاً واحفظ في الجدول أو أضف أجهزة يدوياً.', 24, 40);
+        return;
+      }
+
+      const n = devices.length;
+      const minHGap = 108;
+      const paddingX = 44;
+      const maxPerRow = Math.max(1, Math.floor((W - 2 * paddingX) / minHGap));
+      const cols = Math.min(n, maxPerRow);
+      const rows = Math.ceil(n / cols);
+      const rootY = 56;
+      const rootR = 32;
+      const verticalStem = 96;
+      const rowHeight = 122;
+      const baseY = rootY + rootR + verticalStem;
+      const H = Math.max(540, baseY + rows * rowHeight + 72);
+      canvas.height = H;
+      paintGrid(H);
+
+      const tc = document.getElementById('topoCount');
+      if (tc) tc.textContent = String(n);
+
+      const cx = W / 2;
+      const rootLabel = (typeof ROUTER_IP === 'string' && ROUTER_IP) ? ROUTER_IP : 'MikroTik';
+
+      const drawNodeGlow = (x, y, r, color, glow) => {
+        const grad = ctx.createRadialGradient(x, y, r - 4, x, y, r + 18);
+        grad.addColorStop(0, glow);
+        grad.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(x, y, r + 18, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      };
+
+      ctx.strokeStyle = 'rgba(56,189,248,0.25)';
+      ctx.lineWidth = 1.5;
+
+      devices.forEach((d, idx) => {
+        const row = Math.floor(idx / cols);
+        const col = idx % cols;
+        const inRow = Math.min(cols, n - row * cols);
+        const totalSpan = inRow > 1 ? (inRow - 1) * minHGap : 0;
+        const startX = cx - totalSpan / 2;
+        const x = inRow === 1 ? cx : startX + col * minHGap;
+        const y = baseY + row * rowHeight;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, rootY + rootR);
+        ctx.quadraticCurveTo(cx, rootY + rootR + verticalStem * 0.55, x, y - 22);
+        const st0 = d.status || 'unknown';
+        ctx.strokeStyle = st0 === 'online' ? 'rgba(56,189,248,0.35)' : 'rgba(239,68,68,0.25)';
+        ctx.setLineDash(st0 === 'online' ? [] : [6, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const st = d.status || 'unknown';
+        const color = st === 'online' ? '#10b981' : '#ef4444';
+        const glow = st === 'online' ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)';
+        const nr = 20;
+        drawNodeGlow(x, y, nr, color, glow);
+
+        ctx.beginPath();
+        ctx.arc(x, y, nr, 0, Math.PI * 2);
+        ctx.fillStyle = '#0c1220';
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(x, y, nr - 7, 0, Math.PI * 2);
+        ctx.fillStyle = color + '18';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(x + nr - 5, y - nr + 5, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#050810';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.font = 'bold 11px Tajawal, sans-serif';
+        ctx.fillStyle = '#e8f0fe';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const label = (d.name || 'Device').slice(0, 16);
+        ctx.fillText(label, x, y + nr + 6);
+        ctx.font = '10px IBM Plex Mono, monospace';
+        ctx.fillStyle = '#22d3ee';
+        const ip = (d.ip || '').toString();
+        ctx.fillText(ip, x, y + nr + 20);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(statusDisplay(st), x, y + nr + 34);
+      });
+
+      drawNodeGlow(cx, rootY, rootR, '#0ea5e9', 'rgba(56,189,248,.25)');
+      ctx.beginPath();
+      ctx.arc(cx, rootY, rootR, 0, Math.PI * 2);
+      ctx.fillStyle = '#0c1220';
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, rootY, rootR - 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(14,165,233,0.12)';
+      ctx.fill();
+
+      ctx.font = '22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⬡', cx, rootY);
+
+      ctx.font = 'bold 12px Tajawal, sans-serif';
+      ctx.fillStyle = '#e8f0fe';
+      ctx.textBaseline = 'top';
+      ctx.fillText('MikroTik', cx - ctx.measureText('MikroTik').width / 2, rootY + rootR + 8);
+      ctx.font = '10px IBM Plex Mono, monospace';
+      ctx.fillStyle = '#22d3ee';
+      ctx.fillText(rootLabel, cx - ctx.measureText(rootLabel).width / 2, rootY + rootR + 24);
+    }
+
+    function filterDev(val) {
+      const q = (val || '').toLowerCase();
+      document.querySelectorAll('#fullDevTbl tr').forEach(r => {
+        r.style.display = !q || r.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    }
+
+    function filterStatus(status, elem) {
+      if (elem && elem.parentElement) {
+        elem.parentElement.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('on'));
+        elem.classList.add('on');
+      }
+      window._deviceStatusFilter = status;
+      document.querySelectorAll('#fullDevTbl tr').forEach(r => {
+        if (!r.dataset.status) return;
+        if (status === 'all') {
+          r.style.display = '';
+          return;
+        }
+        r.style.display = r.dataset.status === status ? '' : 'none';
+      });
+    }
+
+    function addDevice() {
+      const name = document.getElementById('fName')?.value.trim();
+      const ip = document.getElementById('fIP')?.value.trim();
+      const mac = document.getElementById('fMAC')?.value.trim() || null;
+      const desc = document.getElementById('fDesc')?.value.trim() || null;
+      const typeEl = document.getElementById('fType');
+      let device_type = 'Unknown';
+      if (typeEl && typeEl.value) {
+        device_type = typeEl.value.replace(/^[^\s]+\s+/, '').trim() || 'Unknown';
+      }
+      if (!name || !ip) {
+        alert('أدخل اسم الجهاز وعنوان IP');
+        return;
+      }
+      if (!currentNetworkId) return;
+      showLoading('جاري إضافة الجهاز...');
+      fetch(`/api/networks/${currentNetworkId}/devices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, ip, mac, device_type, description: desc })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message || 'تم الإضافة');
+            clearForm();
+            showPage('devices', null);
+            loadDevices();
+            fullRefresh();
+          } else {
+            alert(data.message || 'فشل الإضافة');
+          }
+        })
+        .catch(() => alert('خطأ في الاتصال'))
+        .finally(() => hideLoading());
+    }
+
+    function clearForm() {
+      const ids = ['fName', 'fIP', 'fMAC', 'fDesc'];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    }
+    
+    function doLogout() {
+      if (confirm('هل تريد تسجيل الخروج؟')) {
+        stopLivePolling();
+        window.location.href = '/logout';
+      }
+    }
+
+    // بدء تحميل الصفحة
+    window.addEventListener('load', () => {
+      console.log('🚀 بدء تحميل الصفحة...');
+      loadInterfaces();
+      loadDevices();
+      fullRefresh();
+      checkMikrotikFirstLoginDialog();
+      startLivePolling();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopLivePolling();
+      } else {
+        startLivePolling();
+        if (currentNetworkId) {
+          liveSilentDashboard();
+          loadDevicesSilent();
+        }
+      }
+    });
+    window.addEventListener('pagehide', () => stopLivePolling());
+
+    const currentNetworkId = {{ current_network.id if current_network else 'null' }};
+    const ROUTER_IP = {{ (current_network.mikrotik_ip if current_network else '')|tojson }};
+    let loadingCount = 0;
+
+    function loadDevices(silent) {
+      if (!currentNetworkId) return;
+      if (!silent) showLoading('جاري تحميل قائمة الأجهزة...');
+      fetch(`/api/networks/${currentNetworkId}/devices`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            renderDevicesTable(data.devices || []);
+          }
+        })
+        .catch(error => console.error('خطأ في جلب الأجهزة:', error))
+        .finally(() => { if (!silent) hideLoading(); });
+    }
+
+    function loadInterfaces() {
+      console.log('loadInterfaces called, currentNetworkId:', currentNetworkId);
+      if (!currentNetworkId) {
+        console.log('No currentNetworkId, skipping interfaces load');
+        const container = document.getElementById('interfacesList');
+        if (container) {
+          container.innerHTML = '<div style="color: var(--red); text-align: center; padding: 20px;">❌ لا توجد شبكة محددة</div>';
+        }
+        return;
+      }
+      console.log('Fetching interfaces for network:', currentNetworkId);
+      fetch(`/api/networks/${currentNetworkId}/interfaces`)
+        .then(r => {
+          console.log('Interfaces response status:', r.status);
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          }
+          return r.json();
+        })
+        .then(data => {
+          console.log('Interfaces data:', data);
+          const container = document.getElementById('interfacesList');
+          if (!container) {
+            console.error('interfacesList container not found');
+            return;
+          }
+          if (data.success && Array.isArray(data.interfaces)) {
+            console.log('Loading interfaces:', data.interfaces);
+            if (data.interfaces.length === 0) {
+              container.innerHTML = '<div style="color: var(--yellow); text-align: center; padding: 30px; font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px;"><span style="font-size: 24px;">⚠️</span>لا توجد واجهات متاحة<br><small style="color: var(--text3);">تحقق من اتصال MikroTik</small></div>';
+              return;
+            }
+            container.innerHTML = data.interfaces.map(iface => `
+              <div class="interface-item" data-interface="${iface}" style="padding: 12px 16px; margin: 4px 0; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; color: var(--text); border: 2px solid transparent; background: var(--bg3); display: flex; align-items: center; gap: 10px; font-weight: 500;">
+                <span style="font-family: var(--mono); color: var(--cyan); font-size: 16px;">⚡</span>
+                <span style="flex: 1;">${iface}</span>
+                <span style="color: var(--text3); font-size: 12px; opacity: 0.7;">interface</span>
+              </div>
+            `).join('');
+
+            // إضافة event listeners للعناصر
+            container.querySelectorAll('.interface-item').forEach(item => {
+              item.addEventListener('click', function() {
+                // إزالة التحديد من جميع العناصر
+                container.querySelectorAll('.interface-item').forEach(el => {
+                  el.style.background = 'var(--bg3)';
+                  el.style.border = '2px solid transparent';
+                  el.style.color = 'var(--text)';
+                  el.style.transform = 'scale(1)';
+                });
+                // تحديد العنصر الحالي
+                this.style.background = 'var(--blue)';
+                this.style.border = '2px solid var(--blue2)';
+                this.style.color = 'white';
+                this.style.transform = 'scale(1.02)';
+                this.style.boxShadow = '0 4px 12px rgba(56, 189, 248, 0.3)';
+                // حفظ الواجهة المختارة
+                this.dataset.selected = 'true';
+              });
+
+              // إضافة hover effect
+              item.addEventListener('mouseenter', function() {
+                if (!this.dataset.selected) {
+                  this.style.background = 'var(--bg)';
+                  this.style.border = '2px solid var(--border2)';
+                  this.style.transform = 'scale(1.01)';
+                  this.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                }
+              });
+
+              item.addEventListener('mouseleave', function() {
+                if (!this.dataset.selected) {
+                  this.style.background = 'var(--bg3)';
+                  this.style.border = '2px solid transparent';
+                  this.style.transform = 'scale(1)';
+                  this.style.boxShadow = 'none';
+                }
+              });
+            });
+          } else {
+            container.innerHTML = '<div style="color: var(--text3); text-align: center; padding: 20px;">لا توجد واجهات متاحة</div>';
+          }
+        })
+        .catch(error => {
+          console.error('خطأ في جلب الواجهات:', error);
+          const container = document.getElementById('interfacesList');
+          if (container) {
+            container.innerHTML = '<div style="color: var(--text3); text-align: center; padding: 20px;">خطأ في تحميل الواجهات</div>';
+          }
+        });
+    }
+
+    function scanNetwork() {
+      const selectedInterface = document.querySelector('#interfacesList .interface-item[data-selected="true"]');
+      const interfaceName = selectedInterface ? selectedInterface.dataset.interface : null;
+      const ipRange = document.getElementById('scanRange')?.value.trim();
+      const statusEl = document.getElementById('scanStatus');
+      const saveBtn = document.getElementById('btnSaveScan');
+      const previewCard = document.getElementById('scanPreviewCard');
+      const previewBody = document.getElementById('scanPreviewBody');
+
+      if (!currentNetworkId || !interfaceName || !ipRange) {
+        alert('يرجى اختيار واجهة وتحديد نطاق IP صالح.');
+        return;
+      }
+
+      lastScanDevices = [];
+      if (saveBtn) saveBtn.disabled = true;
+      if (previewCard) previewCard.style.display = 'none';
+
+      if (statusEl) {
+        statusEl.textContent = '🔄 جاري تنفيذ المسح (معاينة فقط)...';
+      }
+
+      showLoading('جاري تنفيذ مسح IP...');
+      fetch(`/api/networks/${currentNetworkId}/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interface: interfaceName, ip_range: ipRange })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            lastScanDevices = data.devices || [];
+            if (saveBtn) saveBtn.disabled = lastScanDevices.length === 0;
+            if (previewCard && previewBody) {
+              previewCard.style.display = 'block';
+              if (!lastScanDevices.length) {
+                previewBody.innerHTML = '<tr><td colspan="3" style="padding:20px; text-align:center; color:var(--text3);">لا توجد نتائج</td></tr>';
+              } else {
+                previewBody.innerHTML = lastScanDevices.map(d => `
+                  <tr>
+                    <td style="padding:10px 16px; font-family:var(--mono);">${d.ip || '-'}</td>
+                    <td style="padding:10px 16px; font-family:var(--mono);">${d.mac || '-'}</td>
+                    <td style="padding:10px 16px;">${(d.name || '').replace(/</g, '&lt;')}</td>
+                  </tr>
+                `).join('');
+              }
+            }
+            if (statusEl) {
+              statusEl.textContent = `✅ معاينة: ${data.device_count || 0} جهاز — اضغط «حفظ في الجدول» لتطبيق UP/DOWN من الراوتر`;
+            }
+          } else {
+            alert(data.message || 'فشل المسح');
+            if (statusEl) {
+              statusEl.textContent = '❌ فشل في تنفيذ المسح';
+            }
+          }
+        })
+        .catch(error => {
+          console.error('خطأ في المسح:', error);
+          alert('حدث خطأ أثناء المسح');
+          if (statusEl) {
+            statusEl.textContent = '❌ حدث خطأ';
+          }
+        })
+        .finally(() => hideLoading());
+    }
+
+    function saveScanToTable() {
+      if (!currentNetworkId || !lastScanDevices || !lastScanDevices.length) {
+        alert('لا توجد نتائج مسح للحفظ. نفّذ المسح أولاً.');
+        return;
+      }
+      showLoading('جاري الحفظ وفحص ping من الراوتر...');
+      fetch(`/api/networks/${currentNetworkId}/scan/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ devices: lastScanDevices })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message || 'تم الحفظ');
+            loadDevices();
+            fullRefresh();
+            const statusEl = document.getElementById('scanStatus');
+            if (statusEl) {
+              statusEl.textContent = `✅ تم حفظ ${data.device_count || 0} جهاز في الجدول`;
+            }
+          } else {
+            alert(data.message || 'فشل الحفظ');
+          }
+        })
+        .catch(() => alert('خطأ في الاتصال'))
+        .finally(() => hideLoading());
+    }
+
+    function showLoading(message = 'جاري التحميل...') {
+      const overlay = document.getElementById('loadingOverlay');
+      if (!overlay) return;
+      loadingCount++;
+      overlay.querySelector('div:nth-child(2)').textContent = message;
+      overlay.classList.remove('hidden');
+    }
+
+    function hideLoading() {
+      loadingCount = Math.max(0, loadingCount - 1);
+      if (loadingCount === 0) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.classList.add('hidden');
+      }
+    }
+
+    function runNetworkTool() {
+      const tool = (document.getElementById('toolType') || {}).value || 'ping';
+      const ip = (document.getElementById('toolIp') || {}).value?.trim();
+      const outputEl = document.getElementById('toolOutput');
+
+      if (!ip) {
+        alert('يرجى إدخال IP صحيح');
+        return;
+      }
+
+      if (outputEl) {
+        outputEl.textContent = `جاري تنفيذ ${tool} على ${ip} ...`;
+      }
+      fetch('/api/dashboard/tools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool,
+          ip,
+          network_id: currentNetworkId
+        })
+      })
+        .then(async r => {
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw data;
+          return data;
+        })
+        .then(data => {
+          if (!outputEl) return;
+          outputEl.textContent = (data.output && String(data.output).trim())
+            ? data.output
+            : (data.error || data.message || 'لا توجد نتيجة');
+        })
+        .catch((e) => {
+          if (outputEl) outputEl.textContent = e?.error || e?.message || 'فشل الاتصال بالخادم';
+        });
+    }
+
+    function loadDhcpLeases() {
+      const body = document.getElementById('dhcpLeaseBody');
+      if (!body || !currentNetworkId) return;
+      body.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--text3); text-align:center;">جاري التحميل...</td></tr>';
+      fetch(`/api/dashboard/tools/dhcp-leases?network_id=${currentNetworkId}`)
+        .then(async r => {
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw data;
+          return data;
+        })
+        .then(data => {
+          const rows = Array.isArray(data.leases) ? data.leases : [];
+          if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--text3); text-align:center;">لا توجد DHCP leases</td></tr>';
+            return;
+          }
+          body.innerHTML = rows.map((r) => `
+            <tr>
+              <td style="padding:10px 12px; font-family:var(--mono);">${escHtml(r.address || '-')}</td>
+              <td style="padding:10px 12px; font-family:var(--mono);">${escHtml(r.mac_address || '-')}</td>
+              <td style="padding:10px 12px;">${escHtml(r.status || '-')}</td>
+              <td style="padding:10px 12px;">${escHtml(r.server || '-')}</td>
+              <td style="padding:10px 12px;">${escHtml(r.host_name || '-')}</td>
+              <td style="padding:10px 12px;">
+                <button class="btn btn-ghost" type="button" style="padding:6px 10px; font-size:12px;" onclick="kickDhcpLease('${escHtml(r.address || '')}', '${escHtml(r.mac_address || '')}')">طرد</button>
+              </td>
+            </tr>
+          `).join('');
+        })
+        .catch((e) => {
+          body.innerHTML = `<tr><td colspan="6" style="padding:16px; color:var(--red2); text-align:center;">${escHtml(e?.error || 'تعذر جلب DHCP leases')}</td></tr>`;
+        });
+    }
+
+    function kickDhcpLease(ip, mac) {
+      const ipInput = document.getElementById('kickIp');
+      const macInput = document.getElementById('kickMac');
+      const status = document.getElementById('dhcpKickStatus');
+      const targetIp = (ip || ipInput?.value || '').trim();
+      const targetMac = (mac || macInput?.value || '').trim();
+      if (!targetIp && !targetMac) {
+        if (status) status.textContent = 'أدخل IP أو MAC للطرد.';
+        return;
+      }
+      if (status) status.textContent = 'جاري تنفيذ الطرد...';
+      fetch('/api/dashboard/tools/dhcp-kick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ network_id: currentNetworkId, ip: targetIp, mac: targetMac })
+      })
+        .then(async r => {
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw data;
+          return data;
+        })
+        .then((data) => {
+          if (status) status.textContent = data.message || 'تم الطرد بنجاح';
+          if (ipInput) ipInput.value = '';
+          if (macInput) macInput.value = '';
+          loadDhcpLeases();
+        })
+        .catch((e) => {
+          if (status) status.textContent = e?.error || 'فشل تنفيذ الطرد';
+        });
+    }
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetWatch - إنشاء حساب جديد</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Oxanium:wght@400;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #050810;
+      --bg2: #0d1220;
+      --bg3: #151d2e;
+      --panel: #0f1419;
+      --panel2: #131820;
+      --border: #1e293b;
+      --border2: #263546;
+      --text: #e2e8f0;
+      --text2: #cbd5e1;
+      --text3: #64748b;
+      --blue: #38bdf8;
+      --blue2: #0ea5e9;
+      --blue3: #06b6d4;
+      --cyan: #22d3ee;
+      --green: #10b981;
+      --green2: #34d399;
+      --yellow: #f59e0b;
+      --yellow2: #fbbf24;
+      --red: #ef4444;
+      --red2: #f87171;
+      --purple: #a78bfa;
+      --display: 'Oxanium', 'Tajawal', system-ui;
+      --arabic: 'Tajawal', system-ui;
+      --mono: 'IBM Plex Mono', monospace;
+    }
+    
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--arabic);
+      overflow: hidden;
+    }
+    
+    .grid-bg {
+      position: fixed; inset: 0;
+      background-image: 
+        linear-gradient(0deg, transparent 24%, rgba(56,189,248,.05) 25%, rgba(56,189,248,.05) 26%, transparent 27%, transparent 74%, rgba(56,189,248,.05) 75%, rgba(56,189,248,.05) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(56,189,248,.05) 25%, rgba(56,189,248,.05) 26%, transparent 27%, transparent 74%, rgba(56,189,248,.05) 75%, rgba(56,189,248,.05) 76%, transparent 77%, transparent);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .scan-line {
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(255,255,255,.03) 0px,
+        rgba(255,255,255,.03) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      z-index: 2;
+      animation: scan 8s linear infinite;
+    }
+    
+    @keyframes scan {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(10px); }
+    }
+    
+    #screen-register {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      position: relative;
+      z-index: 3;
+      padding: 20px;
+    }
+    
+    .register-wrap {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+    }
+    
+    .register-brand {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .brand-logo {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--bg3), var(--panel2));
+      border: 1px solid var(--border2);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 0 30px rgba(56,189,248,.15);
+    }
+    
+    .brand-logo::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(56,189,248,.4), transparent, rgba(56,189,248,.2));
+      z-index: -1;
+    }
+    
+    .brand-logo svg {
+      width: 36px;
+      height: 36px;
+    }
+    
+    .brand-name {
+      font-family: var(--display);
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      text-shadow: 0 0 30px rgba(56,189,248,.3);
+    }
+    
+    .brand-name span {
+      color: var(--blue);
+    }
+    
+    .brand-tagline {
+      font-size: 13px;
+      color: var(--text3);
+      margin-top: 4px;
+      letter-spacing: 0.05em;
+    }
+    
+    .register-card {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 36px;
+      position: relative;
+      overflow: hidden;
+      max-height: calc(100vh - 280px);
+      overflow-y: auto;
+    }
+    
+    .register-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--blue), transparent);
+    }
+    
+    .field-group {
+      margin-bottom: 16px;
+    }
+    
+    .field-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text2);
+      margin-bottom: 8px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    
+    .field-group input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--arabic);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .field-group input::placeholder {
+      color: var(--text3);
+    }
+    
+    .field-group input:focus {
+      border-color: var(--blue2);
+      box-shadow: 0 0 0 3px rgba(56,189,248,.12);
+    }
+    
+    .field-hint {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 4px;
+      font-family: var(--mono);
+    }
+    
+    .register-btn {
+      width: 100%;
+      padding: 13px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, var(--blue2), var(--blue3));
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: var(--arabic);
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: opacity 0.2s, transform 0.1s;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .register-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.1), transparent);
+    }
+    
+    .register-btn:hover {
+      opacity: 0.9;
+    }
+    
+    .register-btn:active {
+      transform: scale(0.98);
+    }
+    
+    .register-footer {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text3);
+    }
+    
+    .register-footer a {
+      color: var(--blue);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    
+    .register-footer a:hover {
+      text-decoration: underline;
+      color: var(--blue2);
+    }
+    
+    .register-err {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      color: var(--red2);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-bottom: 16px;
+      display: none;
+      text-align: center;
+    }
+    
+    .register-err.show {
+      display: block;
+    }
+    
+    .pw-hint {
+      background: rgba(56,189,248,.08);
+      border: 1px solid rgba(56,189,248,.15);
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+    
+    .pw-hint ul {
+      margin: 0;
+      padding-right: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .pw-hint li {
+      list-style: none;
+    }
+    
+    .pw-hint li::before {
+      content: '✓ ';
+      color: var(--green2);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+  <div class="scan-line"></div>
+  
+  <div id="screen-register">
+    <div class="register-wrap">
+      <div class="register-brand">
+        <div class="brand-logo">
+          <svg viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.2"/>
+            <circle cx="10" cy="10" r="4" stroke="white" stroke-width="1.2" stroke-dasharray="2 2"/>
+            <circle cx="10" cy="10" r="2" fill="white"/>
+          </svg>
+        </div>
+        <div class="brand-name">NET<span>WATCH</span></div>
+        <div class="brand-tagline">إنشاء حساب جديد</div>
+      </div>
+      
+      <div class="register-card">
+        <div class="register-err" id="registerErr">
+          {% with messages = get_flashed_messages() %}
+            {% if messages %}
+              {{ messages[0] }}
+            {% endif %}
+          {% endwith %}
+        </div>
+        
+        <form method="POST" action="{{ url_for('auth.register') }}">
+          <div class="field-group">
+            <label>اسم المستخدم</label>
+            <input type="text" name="username" placeholder="اختر اسم فريد" required minlength="3">
+            <div class="field-hint">3-50 أحرف (أحرف وأرقام فقط)</div>
+          </div>
+          
+          <div class="field-group">
+            <label>البريد الإلكتروني</label>
+            <input type="email" name="email" placeholder="بريدك الإلكتروني" required>
+          </div>
+          
+          <div class="field-group">
+            <label>كلمة المرور</label>
+            <input type="password" name="password" id="password" placeholder="كلمة مرور قوية (8+ أحرف)" required minlength="8">
+            <div class="pw-hint">
+              <ul>
+                <li>حرف كبير واحد على الأقل</li>
+                <li>حرف صغير واحد على الأقل</li>
+                <li>رقم واحد على الأقل</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="field-group">
+            <label>تأكيد كلمة المرور</label>
+            <input type="password" name="confirm_password" id="confirm_password" placeholder="أعد إدخال كلمة المرور" required minlength="8">
+          </div>
+          
+          <button type="submit" class="register-btn">إنشاء الحساب</button>
+        </form>
+        
+        <div class="register-footer">
+          لديك حساب بالفعل؟ <a href="{{ url_for('auth.login') }}">تسجيل الدخول</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
